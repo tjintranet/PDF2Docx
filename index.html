@@ -39,10 +39,22 @@
             cursor: pointer;
             font-size: 16px;
             margin: 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background-color: #1976D2;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        button:active {
+            transform: translateY(0px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
         button:disabled {
             background-color: #ccc;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         #status {
             margin-top: 20px;
@@ -96,7 +108,11 @@
         </div>
         <div id="status"></div>
         <div id="textContent"></div>
-        <button id="copyButton" style="display: none;" onclick="copyText()">Copy Text</button>
+        <div id="copyButtons" style="display: none;">
+            <button onclick="copyText()">Copy Plain Text</button>
+            <button onclick="copyRTF()">Copy as Rich Text</button>
+            <button onclick="downloadRTF()">Download RTF File</button>
+        </div>
     </div>
 
     <script>
@@ -108,7 +124,7 @@
         const status = document.getElementById('status');
         const progressBar = document.getElementById('progressBar');
         const textContent = document.getElementById('textContent');
-        const copyButton = document.getElementById('copyButton');
+        const copyButtons = document.getElementById('copyButtons');
 
         // Handle drag and drop events
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -164,7 +180,7 @@
             status.innerHTML = '<p>Extracting text from PDF...</p>';
             progressBar.style.display = 'block';
             textContent.style.display = 'none';
-            copyButton.style.display = 'none';
+            copyButtons.style.display = 'none';
             updateProgress(0);
 
             try {
@@ -185,13 +201,66 @@
                 const extractedText = fullText.join('\n\n');
                 textContent.textContent = extractedText;
                 textContent.style.display = 'block';
-                copyButton.style.display = 'block';
+                copyButtons.style.display = 'block';
                 status.innerHTML = '<p class="success">Text extracted successfully! You can now copy the text and paste it into Word.</p>';
                 updateProgress(100);
                 
             } catch (error) {
                 console.error('Conversion error:', error);
                 status.innerHTML = `<p class="error">Error details: ${error.message}</p>`;
+            }
+        }
+
+        function convertToRTF(text) {
+            // Basic RTF header and footer
+            const rtfHeader = "{\\rtf1\\ansi\\ansicpg1252\\cocoartf1671\\cocoasubrtf600\n" +
+                            "{\\fonttbl\\f0\\fswiss\\fcharset0 Helvetica;}\n" +
+                            "{\\colortbl;\\red255\\green255\\blue255;}\n" +
+                            "\\paperw11900\\paperh16840\\margl1440\\margr1440\\vieww10800\\viewh8400\\viewkind0\n" +
+                            "\\pard\\tx566\\tx1133\\tx1700\\tx2267\\tx2834\\tx3401\\tx3968\\tx4535\\tx5102\\tx5669\\tx6236\\tx6803\\pardirnatural\\partightenfactor0\n" +
+                            "\\f0\\fs24 \\cf0 ";
+            const rtfFooter = "}";
+            
+            // Convert special characters and add paragraph breaks
+            let rtfContent = text
+                .replace(/\n/g, "\\par\n")  // Convert newlines to RTF paragraphs
+                .replace(/[\\{}]/g, "\\        function copyText() {")  // Escape RTF special characters
+                .replace(/[^\x00-\x7F]/g, c => `\\u${c.charCodeAt(0)}`); // Handle Unicode
+
+            return rtfHeader + rtfContent + rtfFooter;
+        }
+
+        function downloadRTF() {
+            const text = textContent.textContent;
+            const rtfContent = convertToRTF(text);
+            const blob = new Blob([rtfContent], { type: 'application/rtf' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'converted-document.rtf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            status.innerHTML = '<p class="success">RTF file downloaded!</p>';
+        }
+
+        async function copyRTF() {
+            const text = textContent.textContent;
+            const rtfContent = convertToRTF(text);
+            
+            try {
+                // Attempt to copy as rich text
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/rtf': new Blob([rtfContent], { type: 'text/rtf' }),
+                        'text/plain': new Blob([text], { type: 'text/plain' })
+                    })
+                ]);
+                status.innerHTML = '<p class="success">Rich text copied to clipboard!</p>';
+            } catch (err) {
+                console.error('Failed to copy as rich text:', err);
+                status.innerHTML = '<p class="error">Failed to copy as rich text. You can download the RTF file instead.</p>';
             }
         }
 
