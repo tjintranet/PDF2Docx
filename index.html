@@ -189,12 +189,12 @@
                 updateProgress(75);  // 75% progress
 
                 // Create Word document
-                const doc = new docx.Document({
+                const doc = new window.docx.Document({
                     sections: [{
                         properties: {},
                         children: allText.map(text => 
-                            new docx.Paragraph({
-                                children: [new docx.TextRun(text)]
+                            new window.docx.Paragraph({
+                                children: [new window.docx.TextRun(text)]
                             })
                         )
                     }]
@@ -228,7 +228,7 @@
             }
 
             try {
-                const blob = await docx.Packer.toBlob(convertedDocument);
+                const blob = await window.docx.Packer.toBlob(convertedDocument);
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
