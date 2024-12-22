@@ -106,4 +106,142 @@
         let convertedDocument = null;
 
         // Handle drag and drop events
-        ['dragenter', 'dragover', 'dragleave', '
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            handleFile(file);
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            handleFile(file);
+        }
+
+        function updateProgress(percent) {
+            progressBar.style.display = 'block';
+            progressBar.querySelector('div').style.width = `${percent}%`;
+        }
+
+        async function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                status.innerHTML = '<p class="error">Please upload a PDF file.</p>';
+                return;
+            }
+
+            status.innerHTML = '<p>Converting PDF to DOCX...</p>';
+            progressBar.style.display = 'block';
+            updateProgress(0);
+            previewArea.style.display = 'none';
+            downloadButton.style.display = 'none';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                status.innerHTML = '<p>Extracting text from PDF...</p>';
+                
+                let allText = [];
+                const totalPages = pdf.numPages;
+
+                for (let i = 1; i <= totalPages; i++) {
+                    updateProgress((i / totalPages) * 50);  // First 50% for PDF processing
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    allText.push(pageText);
+                    
+                    // Update preview
+                    if (i === 1) {
+                        previewContent.textContent = pageText.substring(0, 500) + '...';
+                        previewArea.style.display = 'block';
+                    }
+                }
+
+                status.innerHTML = '<p>Creating DOCX document...</p>';
+                updateProgress(75);  // 75% progress
+
+                // Create Word document
+                const doc = new docx.Document({
+                    sections: [{
+                        properties: {},
+                        children: allText.map(text => 
+                            new docx.Paragraph({
+                                children: [new docx.TextRun(text)]
+                            })
+                        )
+                    }]
+                });
+
+                // Store the document for later download
+                convertedDocument = doc;
+                
+                updateProgress(100);
+                status.innerHTML = '<p class="success">Conversion complete! Click the download button below.</p>';
+                downloadButton.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Conversion error:', error);
+                status.innerHTML = `<p class="error">Error details: ${error.message}</p>`;
+                try {
+                    console.log('PDF document info:', {
+                        numPages: pdf ? pdf.numPages : 'PDF not loaded',
+                        pdfVersion: pdf ? pdf._pdfInfo.version : 'Unknown'
+                    });
+                } catch (e) {
+                    console.log('Could not get PDF info:', e);
+                }
+            }
+        }
+
+        async function downloadDocument() {
+            if (!convertedDocument) {
+                status.innerHTML = '<p class="error">No document available for download. Please convert a PDF first.</p>';
+                return;
+            }
+
+            try {
+                const blob = await docx.Packer.toBlob(convertedDocument);
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'converted-document.docx';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Download error:', error);
+                status.innerHTML = `<p class="error">Error downloading document: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
