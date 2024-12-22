@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF to DOCX Converter</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.3/docx.min.js"></script>
+    <script src="https://unpkg.com/docx@8.2.3/build/index.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -91,6 +91,17 @@
         </div>
     </div>
 
+    <script>
+        // Check if docx library is loaded
+        window.addEventListener('load', function() {
+            if (typeof docx === 'undefined') {
+                console.error('DOCX library not loaded properly');
+                status.innerHTML = '<p class="error">Error: Required libraries not loaded. Please check your internet connection and try again.</p>';
+            } else {
+                console.log('DOCX library loaded successfully');
+            }
+        });
+    </script>
     <script>
         // Set up PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -189,12 +200,12 @@
                 updateProgress(75);  // 75% progress
 
                 // Create Word document
-                const doc = new window.docx.Document({
+                const doc = new docx.Document({
                     sections: [{
                         properties: {},
                         children: allText.map(text => 
-                            new window.docx.Paragraph({
-                                children: [new window.docx.TextRun(text)]
+                            new docx.Paragraph({
+                                children: [new docx.TextRun(text)]
                             })
                         )
                     }]
@@ -228,7 +239,7 @@
             }
 
             try {
-                const blob = await window.docx.Packer.toBlob(convertedDocument);
+                const blob = await docx.Packer.toBlob(convertedDocument);
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
